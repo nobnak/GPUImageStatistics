@@ -1,0 +1,58 @@
+﻿#define NUM_THREADS 16
+#define SCALE_TO_INT 255
+#define SCALE_TO_FLOAT (1.0 / SCALE_TO_INT)
+
+#pragma kernel Sum
+#pragma kernel Average
+#pragma kernel Covariance
+
+Texture2D<float4> _Image;
+uint2 _Size;
+RWStructuredBuffer<uint> _Total;
+
+groupshared uint gtotal[4];
+
+[numthreads(NUM_THREADS,NUM_THREADS,1)]
+void Sum(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
+	uint gidi = gid.x + gid.y * NUM_THREADS;
+	if (gidi < 4)
+		gtotal[gidi] = 0;
+	GroupMemoryBarrierWithGroupSync();
+
+	if (all(id.xy < _Size)) {
+		float pixel[4] = (float[4])round(SCALE_TO_INT * _Image[id.xy]);
+
+		for (uint i = 0; i < 4; i++) {
+			uint v = pixel[i];
+			InterlockedAdd(gtotal[i], v);
+		}
+	}
+
+	GroupMemoryBarrierWithGroupSync();
+	if (gidi < 4)
+		InterlockedAdd(_Total[gidi], gtotal[gidi]);
+}
+
+RWStructuredBuffer<float> _Average;
+
+[numthreads(1,1,1)]
+void Average(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
+	uint idi = id.x;
+	if (idi < 4)
+		_Average[idi] = _Total[idi] / (float)(_Size.x * _Size.y * SCALE_TO_INT);
+}
+
+groupshared float4x4 _gcovariance;
+
+[numthreads(NUM_THREADS,NUM_THREADS,1)]
+void Covariance(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
+	uint gidi = gid.x + gid.y * NUM_THREADS;
+	if (gidi < 1)
+		_gcovariance = (float4x4)0;
+	GroupMemoryBarrierWithGroupSync();
+
+	int2 p = int2(gid.x, gid.x + gid.y);
+	if (all(p < 4)) {
+		
+	}
+}

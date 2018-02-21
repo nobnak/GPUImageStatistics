@@ -1,0 +1,33 @@
+﻿#define NUM_THREADS 16
+
+#pragma kernel AccumulateX4
+#pragma kernel AccumulateY4
+
+uint2 _InputSize;
+StructuredBuffer<float4> _Input4;
+RWStructuredBuffer<float4> _Output4;
+
+[numthreads(1, NUM_THREADS,1)]
+void AccumulateX4 (uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
+	uint y = id.y;
+	if (y < _InputSize.y) {
+		float4 v = (float4)0;
+		for (uint x = 0; x < _InputSize.x; x++) {
+			uint i = x + y * _InputSize.x;
+			v += _Input4[i];
+		}
+		_Output4[y] = v;
+	}
+}
+[numthreads(NUM_THREADS,1,1)]
+void AccumulateY4 (uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
+	uint x = id.x;
+	if (x < _InputSize.x) {
+		float4 v = (float4)0;
+		for (uint y = 0; y < _InputSize.y; y++) {
+			uint i = x + y * _InputSize.x;
+			v += _Input4[i];
+		}
+		_Output4[x] = v;
+	}
+}
