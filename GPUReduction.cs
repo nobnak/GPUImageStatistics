@@ -16,6 +16,8 @@ namespace GPUImageStatisticsSystem {
         public const string PROP_INPUT4 = "_Input4";
         public const string PROP_OUTPUT4 = "_Output4";
 
+        public static readonly int STRIDE_OF_VECTOR4 = Marshal.SizeOf(typeof(Vector4));
+
         protected ComputeShader cs;
         protected int kernelAccumX4;
         protected int kernelAccumY4;
@@ -28,9 +30,15 @@ namespace GPUImageStatisticsSystem {
 
         public Vector4 Accumulate4(ComputeBuffer grid4, int width, int height) {
             var reduction = new Vector4[1];
-            var reductionBuf = new ComputeBuffer(reduction.Length, Marshal.SizeOf(reduction[0]));
-            var lineoutBuf = new ComputeBuffer(height, reductionBuf.stride);
-            try {
+            using (var reductionBuf = new DisposableBuffer(reduction.Length, STRIDE_OF_VECTOR4)) {
+                Accumulate4(grid4, width, height, reductionBuf);
+                reductionBuf.Buffer.GetData(reduction);
+                return reduction[0];
+            }
+        }
+
+        public void Accumulate4(ComputeBuffer grid4, int width, int height, ComputeBuffer outputBuf) {
+            using (var lineoutBuf = new DisposableBuffer(height, STRIDE_OF_VECTOR4)) {
                 cs.SetInts(PROP_INPUT_SIZE, width, height);
                 cs.SetBuffer(kernelAccumX4, PROP_INPUT4, grid4);
                 cs.SetBuffer(kernelAccumX4, PROP_OUTPUT4, lineoutBuf);
@@ -38,14 +46,8 @@ namespace GPUImageStatisticsSystem {
 
                 cs.SetInts(PROP_INPUT_SIZE, 1, height);
                 cs.SetBuffer(kernelAccumY4, PROP_INPUT4, lineoutBuf);
-                cs.SetBuffer(kernelAccumY4, PROP_OUTPUT4, reductionBuf);
+                cs.SetBuffer(kernelAccumY4, PROP_OUTPUT4, outputBuf);
                 cs.Dispatch(kernelAccumY4, 1, 1, 1);
-
-                reductionBuf.GetData(reduction);
-                return reduction[0];
-            } finally {
-                lineoutBuf.Dispose();
-                reductionBuf.Dispose();
             }
         }
 

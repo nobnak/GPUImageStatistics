@@ -1,45 +1,48 @@
 ﻿#define NUM_THREADS 16
+#define NUM_THREADS2 (NUM_THREADS * NUM_THREADS)
 #define SCALE_TO_INT 255
 #define SCALE_TO_FLOAT (1.0 / SCALE_TO_INT)
 
 #pragma kernel Sum
-#pragma kernel Average
+#pragma kernel Multiply4
 #pragma kernel Covariance
 
-Texture2D<float4> _Image;
-uint2 _Size;
-RWStructuredBuffer<uint> _Total;
+uint2 _InputSize;
+Texture2D<float4> _InputImage;
+StructuredBuffer<float4> _Input4;
+
+uint2 _OutputSize;
+RWStructuredBuffer<float4> _Output4;
 
 groupshared uint gtotal[4];
 
 [numthreads(NUM_THREADS,NUM_THREADS,1)]
-void Sum(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
-	uint gidi = gid.x + gid.y * NUM_THREADS;
-	if (gidi < 4)
-		gtotal[gidi] = 0;
+void Sum(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
+	uint gtindex = gtid.x + gtid.y * NUM_THREADS;
+	if (gtindex == 0)
+		gtotal = (uint[4])0;
 	GroupMemoryBarrierWithGroupSync();
 
-	if (all(id.xy < _Size)) {
-		float pixel[4] = (float[4])round(SCALE_TO_INT * _Image[id.xy]);
+	uint4 pixel = (uint4)round(_InputImage[id.xy] * SCALE_TO_INT);
+	uint v[4] = (uint[4])pixel;
+	for (uint i = 0; i < 4; i++)
+		InterlockedAdd(gtotal[i], v[i]);
 
-		for (uint i = 0; i < 4; i++) {
-			uint v = pixel[i];
-			InterlockedAdd(gtotal[i], v);
-		}
+	if (gtindex == 0) {
+		uint gindex = gid.x + gid.y * _OutputSize.x;
+		float4 v = ((uint4)gtotal) * SCALE_TO_FLOAT;
+		_Output4[gindex] = v;
 	}
-
-	GroupMemoryBarrierWithGroupSync();
-	if (gidi < 4)
-		InterlockedAdd(_Total[gidi], gtotal[gidi]);
 }
 
-RWStructuredBuffer<float> _Average;
+float4 _Multiplied4;
 
-[numthreads(1,1,1)]
-void Average(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
-	uint idi = id.x;
-	if (idi < 4)
-		_Average[idi] = _Total[idi] / (float)(_Size.x * _Size.y * SCALE_TO_INT);
+[numthreads(NUM_THREADS,1,1)]
+void Multiply4(uint3 id : SV_DispatchThreadID) {
+	uint tid = id.x;
+	if (tid < _InputSize.x) {
+		_Output4[tid] = _Input4[tid] * _Multiplied4;
+	}
 }
 
 groupshared float4x4 _gcovariance;

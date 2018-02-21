@@ -35,8 +35,7 @@ namespace GPUImageStatisticsSystem {
             var redwidth = 4;
             var redheight = 4;
             var redinput = new Vector4[redwidth * redheight];
-            var redbuf = new ComputeBuffer(redinput.Length, Marshal.SizeOf(redinput[0]));
-            try {
+            using (var redbuf = new DisposableBuffer(redinput.Length, Marshal.SizeOf(redinput[0]))) {
                 for (var x = 0; x < redwidth; x++) {
                     for (var y = 0; y < redheight; y++) {
                         var v = Vector4.zero;
@@ -44,13 +43,11 @@ namespace GPUImageStatisticsSystem {
                         redinput[x + y * redwidth] = v;
                     }
                 }
-                redbuf.SetData(redinput);
+                redbuf.Buffer.SetData(redinput);
 
                 var red = new GPUReduction();
                 var accum = red.Accumulate4(redbuf, redwidth, redheight);
-                Debug.LogFormat("Reduction : {0}", accum);
-            } finally {
-                redbuf.Dispose();
+                AreEqual(new Vector4(1, 2, 3, 4), accum);
             }
         }
 
