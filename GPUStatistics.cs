@@ -122,12 +122,12 @@ namespace GPUImageStatisticsSystem {
 
                 cs.Dispatch(kernelCovariance, totalWidth, totalHeight, 1);
 
-                reduction.Accumulate4x4(totalCovBuf, totalWidth, totalHeight, outputBuf);
+                reduction.Accumulate4x4(totalCovBuf, totalWidth, totalHeight, totalBuf);
 
                 var pixelCount = tex.width * tex.height;
                 var v = Vector4.one / pixelCount;
                 var m = new Matrix4x4(v, v, v, v);
-                //Multiply4x4(totalBuf, m, outputBuf);
+                Multiply4x4(totalBuf, m, outputBuf);
             }
         }
         public void Covariance(Texture2D tex, ComputeBuffer outputBuf) {

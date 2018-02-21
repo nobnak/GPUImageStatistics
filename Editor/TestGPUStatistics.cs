@@ -5,6 +5,7 @@ using NUnit.Framework;
 using System.Collections;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Generic;
 
 namespace GPUImageStatisticsSystem {
 
@@ -21,20 +22,27 @@ namespace GPUImageStatisticsSystem {
         public const int NUM_THREADS = 16;
 
         [Test]
-        public void TestGPUStatisticsSimplePasses() {
+        public void GPUStatistics() {
             var tex = Resources.Load<Texture2D>(IMAGE_NAME);
-            var expectedSum = new Vector4(8, 16, 32, 64);
+            var pixels = tex.GetPixels().ColorToVector4();
+            var expectedSum = pixels.Total();
+            var expectedAverage = pixels.Average();
+            var expectedCovariance = pixels.Covariance(expectedAverage);
 
             var stat = new GPUStatistics();
             var sum = stat.Sum(tex);
             AreEqual(sum, expectedSum);
 
             var average = stat.Average(tex);
-            AreEqual(average, expectedSum / expectedSum.w);
+            AreEqual(average, expectedAverage);
 
             var covariance = stat.Covariance(tex);
-            Debug.LogFormat("Covariance : \n{0}", covariance);
+            AreEqual(covariance, expectedCovariance);
+            Debug.LogFormat("Covariance :\nGPU\n{0}\nCPU\n{1}", covariance, expectedCovariance);
+        }
 
+        [Test]
+        public void GPUReduction() { 
             var redwidth = 4;
             var redheight = 4;
             var redinput = new Vector4[redwidth * redheight];
@@ -63,6 +71,17 @@ namespace GPUImageStatisticsSystem {
             for (var i = 0; i < 4; i++) {
                 Assert.AreEqual(a[i], b[i], delta,
                     string.Format("Vector not equal at i={0} : a={1} b={2}", i, a[i], b[i]));
+            }
+        }
+        private void AreEqual(Matrix4x4 a, Matrix4x4 b, float delta = 1e-3f) {
+            for (var x = 0; x < 4; x++) {
+                for (var y = 0; y < 4; y++) {
+                    var va = a[x, y];
+                    var vb = b[x, y];
+                    Assert.AreEqual(va, vb, delta,
+                        string.Format("Matrix not equal at ({0},{1}) : a={2} b={3}",
+                        x, y, va, vb));
+                }
             }
         }
     }
