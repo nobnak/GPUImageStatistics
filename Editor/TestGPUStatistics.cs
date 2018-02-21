@@ -6,7 +6,7 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace GPUStatisticsSystem {
+namespace GPUImageStatisticsSystem {
 
     public class TestGPUStatistics {
         public const string IMAGE_NAME = "SampleImage";
