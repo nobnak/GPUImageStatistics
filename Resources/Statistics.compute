@@ -1,18 +1,27 @@
 ﻿#define NUM_THREADS 16
 #define NUM_THREADS2 (NUM_THREADS * NUM_THREADS)
-#define SCALE_TO_INT 255
-#define SCALE_TO_FLOAT (1.0 / SCALE_TO_INT)
+#define FLOAT_TO_INT 255
+#define INT_TO_FLOAT (1.0 / FLOAT_TO_INT)
+#define FLOAT_TO_HIGH_INT (FLOAT_TO_INT * FLOAT_TO_INT)
+#define HIGH_INT_TO_FLOAT (1.0 / FLOAT_TO_HIGH_INT)
 
 #pragma kernel Sum
 #pragma kernel Multiply4
+#pragma kernel Multiply4x4
 #pragma kernel Covariance
 
 uint2 _InputSize;
 Texture2D<float4> _InputImage;
 StructuredBuffer<float4> _Input4;
+StructuredBuffer<float4x4> _Input4x4;
 
 uint2 _OutputSize;
 RWStructuredBuffer<float4> _Output4;
+RWStructuredBuffer<float4x4> _Output4x4;
+
+float4 _Param0_4;
+float4x4 _Param0_4x4;
+StructuredBuffer<float4> _ParamBuf0_4;
 
 groupshared uint gtotal[4];
 
@@ -23,39 +32,64 @@ void Sum(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gi
 		gtotal = (uint[4])0;
 	GroupMemoryBarrierWithGroupSync();
 
-	uint4 pixel = (uint4)round(_InputImage[id.xy] * SCALE_TO_INT);
-	uint v[4] = (uint[4])pixel;
-	for (uint i = 0; i < 4; i++)
-		InterlockedAdd(gtotal[i], v[i]);
+	if (all(id.xy < _InputSize)) {
+		uint4 pixel = (uint4)round(_InputImage[id.xy] * FLOAT_TO_INT);
+		uint v[4] = (uint[4])pixel;
+		for (uint i = 0; i < 4; i++)
+			InterlockedAdd(gtotal[i], v[i]);
+	}
+	GroupMemoryBarrierWithGroupSync();
 
 	if (gtindex == 0) {
 		uint gindex = gid.x + gid.y * _OutputSize.x;
-		float4 v = ((uint4)gtotal) * SCALE_TO_FLOAT;
+		float4 v = ((uint4)gtotal) * INT_TO_FLOAT;
 		_Output4[gindex] = v;
 	}
 }
-
-float4 _Multiplied4;
 
 [numthreads(NUM_THREADS,1,1)]
 void Multiply4(uint3 id : SV_DispatchThreadID) {
 	uint tid = id.x;
 	if (tid < _InputSize.x) {
-		_Output4[tid] = _Input4[tid] * _Multiplied4;
+		_Output4[tid] = _Input4[tid] * _Param0_4;
+	}
+}
+[numthreads(NUM_THREADS,1,1)]
+void Multiply4x4(uint3 id : SV_DispatchThreadID) {
+	uint tid = id.x;
+	if (tid < _InputSize.x) {
+		_Output4x4[tid] = _Input4x4[tid] * _Param0_4x4;
 	}
 }
 
-groupshared float4x4 _gcovariance;
+groupshared int4x4 _gcovariance;
 
 [numthreads(NUM_THREADS,NUM_THREADS,1)]
-void Covariance(uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID) {
-	uint gidi = gid.x + gid.y * NUM_THREADS;
-	if (gidi < 1)
-		_gcovariance = (float4x4)0;
+void Covariance(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
+	uint gtindex = gtid.x + gtid.y * NUM_THREADS;
+	if (gtindex == 0)
+		_gcovariance = (int4x4)0;
 	GroupMemoryBarrierWithGroupSync();
 
-	int2 p = int2(gid.x, gid.x + gid.y);
-	if (all(p < 4)) {
-		
+	if (all(id.xy < _InputSize)) {
+		float4 diff = _InputImage[id.xy] - _ParamBuf0_4[0];
+		float v[4] = (float[4])diff;
+		for (uint x = 0; x < 4; x++) {
+			for (uint y = x; y < 4; y++) {
+				InterlockedAdd(_gcovariance[y][x], (int)round(v[x] * v[y] * FLOAT_TO_HIGH_INT));
+			}
+		}
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	if (gtindex == 0) {
+		for (uint x = 0; x < 4; x++) {
+			for (uint y = x + 1; y < 4; y++) {
+				_gcovariance[x][y] = _gcovariance[y][x];
+			}
+		}
+		float4x4 cov = HIGH_INT_TO_FLOAT * _gcovariance;
+		uint gindex = gid.x + gid.y * _OutputSize.x;
+		_Output4x4[gindex] = cov;
 	}
 }

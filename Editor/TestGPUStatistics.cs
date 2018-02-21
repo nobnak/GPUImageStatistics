@@ -23,14 +23,17 @@ namespace GPUImageStatisticsSystem {
         [Test]
         public void TestGPUStatisticsSimplePasses() {
             var tex = Resources.Load<Texture2D>(IMAGE_NAME);
-            var expectedSum = new Vector4(4, 16, 64, 1024);
+            var expectedSum = new Vector4(8, 16, 32, 64);
 
             var stat = new GPUStatistics();
             var sum = stat.Sum(tex);
             AreEqual(sum, expectedSum);
 
             var average = stat.Average(tex);
-            AreEqual(average, expectedSum / 1024);
+            AreEqual(average, expectedSum / expectedSum.w);
+
+            var covariance = stat.Covariance(tex);
+            Debug.LogFormat("Covariance : \n{0}", covariance);
 
             var redwidth = 4;
             var redheight = 4;
