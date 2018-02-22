@@ -6,6 +6,7 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GPUImageStatisticsSystem {
 
@@ -20,25 +21,30 @@ namespace GPUImageStatisticsSystem {
         public const string PROP_TOTAL = "Total";
 
         public const int NUM_THREADS = 16;
+        public const float ACCURACY_RELATIVE = 1e-2f;
+        public const float ACCURACY_ABSOLUTE = 1e-6f;
 
         [Test]
         public void GPUStatistics() {
             var tex = Resources.Load<Texture2D>(IMAGE_NAME);
-            var pixels = tex.GetPixels().ColorToVector4();
+            var pixels = (PlayerSettings.colorSpace == ColorSpace.Linear)
+                ? tex.GetPixels().Select(c => c.linear).ColorToVector4()
+                : tex.GetPixels().ColorToVector4();
             var expectedSum = pixels.Total();
             var expectedAverage = pixels.Average();
             var expectedCovariance = pixels.Covariance(expectedAverage);
 
             var stat = new GPUStatistics();
             var sum = stat.Sum(tex);
-            AreEqual(sum, expectedSum);
+            AreApproximatelyEqual(expectedSum, sum);
 
             var average = stat.Average(tex);
-            AreEqual(average, expectedAverage);
+            AreApproximatelyEqual(expectedAverage, average);
 
             var covariance = stat.Covariance(tex);
-            AreEqual(covariance, expectedCovariance);
+            AreApproximatelyEqual(expectedCovariance, covariance);
             Debug.LogFormat("Covariance :\nGPU\n{0}\nCPU\n{1}", covariance, expectedCovariance);
+
         }
 
         [Test]
@@ -58,7 +64,7 @@ namespace GPUImageStatisticsSystem {
 
                 var red = new GPUReduction();
                 var accum = red.Accumulate4(redbuf, redwidth, redheight);
-                AreEqual(new Vector4(1, 2, 3, 4), accum);
+                AreApproximatelyEqual(new Vector4(1, 2, 3, 4), accum);
             }
         }
 
@@ -67,22 +73,25 @@ namespace GPUImageStatisticsSystem {
                 string.Format("({{0:{0}}},{{1:{0}}},{{2:{0}}},{{3:{0}}}", accuracy),
                 v.x, v.y, v.z, v.w);
         }
-        private void AreEqual(Vector4 a, Vector4 b, float delta = 1e-3f) {
+        private void AreApproximatelyEqual(Vector4 expected, Vector4 actual, float delta = ACCURACY_ABSOLUTE) {
             for (var i = 0; i < 4; i++) {
-                Assert.AreEqual(a[i], b[i], delta,
-                    string.Format("Vector not equal at i={0} : a={1} b={2}", i, a[i], b[i]));
+                Assert.AreEqual(expected[i], actual[i], Accuracy(expected[i], delta),
+                    string.Format("Vector not equal at i={0} : a={1} b={2}", i, expected[i], actual[i]));
             }
         }
-        private void AreEqual(Matrix4x4 a, Matrix4x4 b, float delta = 1e-3f) {
+        private void AreApproximatelyEqual(Matrix4x4 expected, Matrix4x4 actual, float delta = ACCURACY_ABSOLUTE) {
             for (var x = 0; x < 4; x++) {
                 for (var y = 0; y < 4; y++) {
-                    var va = a[x, y];
-                    var vb = b[x, y];
-                    Assert.AreEqual(va, vb, delta,
+                    var va = expected[x, y];
+                    var vb = actual[x, y];
+                    Assert.AreEqual(va, vb, Accuracy(va, delta),
                         string.Format("Matrix not equal at ({0},{1}) : a={2} b={3}",
                         x, y, va, vb));
                 }
             }
+        }
+        private float Accuracy(float value, float delta) {
+            return Mathf.Max(value * ACCURACY_RELATIVE, ACCURACY_ABSOLUTE);
         }
     }
 
