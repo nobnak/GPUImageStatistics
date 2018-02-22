@@ -43,8 +43,6 @@ namespace GPUImageStatisticsSystem {
 
             var covariance = stat.Covariance(tex);
             AreApproximatelyEqual(expectedCovariance, covariance);
-            Debug.LogFormat("Covariance :\nGPU\n{0}\nCPU\n{1}", covariance, expectedCovariance);
-
         }
 
         [Test]

@@ -1,5 +1,7 @@
 ﻿#define NUM_THREADS 16
-#define NUM_THREADS2 (NUM_THREADS * NUM_THREADS)
+#define NUM_THREADS_SQR (NUM_THREADS * NUM_THREADS)
+#define NUM_THREADS4 4
+#define STRIDE_THREADS4 (NUM_THREADS / NUM_THREADS4)
 #define FLOAT_TO_INT 255
 #define INT_TO_FLOAT (1.0 / FLOAT_TO_INT)
 #define FLOAT_TO_HIGH_INT (FLOAT_TO_INT * FLOAT_TO_INT)
@@ -26,9 +28,8 @@ StructuredBuffer<float4> _ParamBuf0_4;
 groupshared uint gtotal[4];
 
 [numthreads(NUM_THREADS,NUM_THREADS,1)]
-void Sum(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
-	uint gtindex = gtid.x + gtid.y * NUM_THREADS;
-	if (gtindex == 0)
+void Sum(uint3 id : SV_DispatchThreadID, uint gindex : SV_GroupIndex, uint3 gid : SV_GroupID) {
+	if (gindex == 0)
 		gtotal = (uint[4])0;
 	GroupMemoryBarrierWithGroupSync();
 
@@ -40,7 +41,7 @@ void Sum(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gi
 	}
 	GroupMemoryBarrierWithGroupSync();
 
-	if (gtindex == 0) {
+	if (gindex == 0) {
 		uint gindex = gid.x + gid.y * _OutputSize.x;
 		float4 v = ((uint4)gtotal) * INT_TO_FLOAT;
 		_Output4[gindex] = v;
@@ -62,34 +63,30 @@ void Multiply4x4(uint3 id : SV_DispatchThreadID) {
 	}
 }
 
-groupshared int4x4 _gcovariance;
+groupshared float4x4 _gcovariance;
 
-[numthreads(NUM_THREADS,NUM_THREADS,1)]
-void Covariance(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
-	uint gtindex = gtid.x + gtid.y * NUM_THREADS;
-	if (gtindex == 0)
-		_gcovariance = (int4x4)0;
+[numthreads(NUM_THREADS4,NUM_THREADS4,1)]
+void Covariance(uint3 id : SV_DispatchThreadID, uint gindex : SV_GroupIndex, 
+		uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID) {
+	uint x = gtid.x;
+	uint y = gtid.y;
+	_gcovariance[y][x] = 0;
 	GroupMemoryBarrierWithGroupSync();
 
-	if (all(id.xy < _InputSize)) {
-		float4 diff = _InputImage[id.xy] - _ParamBuf0_4[0];
-		float v[4] = (float[4])diff;
-		for (uint x = 0; x < 4; x++) {
-			for (uint y = x; y < 4; y++) {
-				InterlockedAdd(_gcovariance[y][x], (int)round(v[x] * v[y] * FLOAT_TO_HIGH_INT));
+	uint3 baseid = gid * uint3(NUM_THREADS, NUM_THREADS, 1);
+	for (uint i = 0; i < NUM_THREADS; i++) {
+		for (uint j = 0; j < NUM_THREADS; j++) {
+			uint3 actid = baseid + uint3(i, j, 0);
+			if (all(actid.xy < _InputSize)) {
+				float dv[4] = (float[4])(_InputImage[actid.xy] - _ParamBuf0_4[0]);
+				_gcovariance[y][x] += dv[x] * dv[y];
 			}
 		}
 	}
 	GroupMemoryBarrierWithGroupSync();
 
-	if (gtindex == 0) {
-		for (uint x = 0; x < 4; x++) {
-			for (uint y = x + 1; y < 4; y++) {
-				_gcovariance[x][y] = _gcovariance[y][x];
-			}
-		}
-		float4x4 cov = HIGH_INT_TO_FLOAT * _gcovariance;
+	if (gindex == 0) {
 		uint gindex = gid.x + gid.y * _OutputSize.x;
-		_Output4x4[gindex] = cov;
+		_Output4x4[gindex] = _gcovariance;
 	}
 }
