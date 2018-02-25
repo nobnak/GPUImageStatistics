@@ -7,6 +7,10 @@
 #define FLOAT_TO_HIGH_INT (FLOAT_TO_INT * FLOAT_TO_INT)
 #define HIGH_INT_TO_FLOAT (1.0 / FLOAT_TO_HIGH_INT)
 
+#define USE_GAMMA_COLORSPACE
+
+#include "UnityCG.cginc"
+
 #pragma kernel Sum
 #pragma kernel Multiply4
 #pragma kernel Multiply4x4
@@ -25,6 +29,14 @@ float4 _Param0_4;
 float4x4 _Param0_4x4;
 StructuredBuffer<float4> _ParamBuf0_4;
 
+float4 LoadPixel(int2 id) {
+	float4 p = _InputImage[id];
+	#if defined(USE_GAMMA_COLORSPACE) && !defined(UNITY_COLORSPACE_GAMMA)
+	p.xyz = LinearToGammaSpace(p.xyz);
+	#endif
+	return p;
+}
+
 groupshared uint gtotal[4];
 
 [numthreads(NUM_THREADS,NUM_THREADS,1)]
@@ -34,7 +46,7 @@ void Sum(uint3 id : SV_DispatchThreadID, uint gindex : SV_GroupIndex, uint3 gid 
 	GroupMemoryBarrierWithGroupSync();
 
 	if (all(id.xy < _InputSize)) {
-		uint4 pixel = (uint4)round(_InputImage[id.xy] * FLOAT_TO_INT);
+		uint4 pixel = (uint4)round(LoadPixel(id.xy) * FLOAT_TO_INT);
 		uint v[4] = (uint[4])pixel;
 		for (uint i = 0; i < 4; i++)
 			InterlockedAdd(gtotal[i], v[i]);
@@ -78,7 +90,7 @@ void Covariance(uint3 id : SV_DispatchThreadID, uint gindex : SV_GroupIndex,
 		for (uint j = 0; j < NUM_THREADS; j++) {
 			uint3 actid = baseid + uint3(i, j, 0);
 			if (all(actid.xy < _InputSize)) {
-				float dv[4] = (float[4])(_InputImage[actid.xy] - _ParamBuf0_4[0]);
+				float dv[4] = (float[4])(LoadPixel(actid.xy) - _ParamBuf0_4[0]);
 				_gcovariance[y][x] += dv[x] * dv[y];
 			}
 		}
