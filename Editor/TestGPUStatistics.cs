@@ -41,7 +41,8 @@ namespace GPUImageStatisticsSystem {
             var average = stat.Average(tex);
             AreApproximatelyEqual(expectedAverage, average);
 
-            var covariance = stat.Covariance(tex);
+            var covariance = stat.Covariance(tex, out average);
+            AreApproximatelyEqual(expectedAverage, average);
             AreApproximatelyEqual(expectedCovariance, covariance);
         }
 

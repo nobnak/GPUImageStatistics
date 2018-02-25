@@ -52,7 +52,7 @@ namespace GPUImageStatisticsSystem {
         }
 
         #region Sum
-        public Vector4 Sum(Texture2D tex) {
+        public Vector4 Sum(Texture tex) {
             var total = new Vector4[1];
             using (var totalBuffer = new DisposableBuffer(total.Length, STRIDE_OF_VECTOR4)) {
                 totalBuffer.Buffer.SetData(total);
@@ -61,7 +61,7 @@ namespace GPUImageStatisticsSystem {
                 return total[0];
             }
         }
-        public void Sum(Texture2D tex, ComputeBuffer outputBuf) {
+        public void Sum(Texture tex, ComputeBuffer outputBuf) {
             var totalWidth = Mathf.CeilToInt(tex.width / (float)NUM_THREADS);
             var totalHeight = Mathf.CeilToInt(tex.width / (float)NUM_THREADS);
 
@@ -80,7 +80,7 @@ namespace GPUImageStatisticsSystem {
         #endregion
 
         #region Average
-        public Vector4 Average(Texture2D tex) {
+        public Vector4 Average(Texture tex) {
             using (var averageBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4)) {
                 Average(tex, averageBuf);
                 var average = new Vector4[1];
@@ -88,7 +88,7 @@ namespace GPUImageStatisticsSystem {
                 return average[0];
             }
         }
-        public void Average(Texture2D tex, ComputeBuffer outputBuf) {
+        public void Average(Texture tex, ComputeBuffer outputBuf) {
             using (var totalBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4)) {
                 var pixelCount = tex.width * tex.height;
                 Sum(tex, totalBuf);
@@ -98,15 +98,20 @@ namespace GPUImageStatisticsSystem {
         #endregion
 
         #region Covariance
-        public Matrix4x4 Covariance(Texture2D tex) {
-            using (var covarianceBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4x4)) {
-                Covariance(tex, covarianceBuf);
-                var covariance = new Matrix4x4[1];
-                covarianceBuf.Buffer.GetData(covariance);
-                return covariance[0];
+        public Matrix4x4 Covariance(Texture tex, out Vector4 average) {
+            using (var covarianceBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4x4))
+            using (var averageBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4)) {
+                Average(tex, averageBuf);
+                Covariance(tex, averageBuf, covarianceBuf);
+                var covarianceData = new Matrix4x4[1];
+                covarianceBuf.Buffer.GetData(covarianceData);
+                var averageData = new Vector4[1];
+                averageBuf.Buffer.GetData(averageData);
+                average = averageData[0];
+                return covarianceData[0];
             }
         }
-        public void Covariance(Texture2D tex, ComputeBuffer averageBuf, ComputeBuffer outputBuf) {
+        public void Covariance(Texture tex, ComputeBuffer averageBuf, ComputeBuffer outputBuf) {
             var totalWidth = Mathf.CeilToInt(tex.width / (float)NUM_THREADS);
             var totalHeight = Mathf.CeilToInt(tex.height / (float)NUM_THREADS);
 
@@ -130,7 +135,7 @@ namespace GPUImageStatisticsSystem {
                 Multiply4x4(totalBuf, m, outputBuf);
             }
         }
-        public void Covariance(Texture2D tex, ComputeBuffer outputBuf) {
+        public void Covariance(Texture tex, ComputeBuffer outputBuf) {
             using (var averageBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4)) {
                 Average(tex, averageBuf);
                 Covariance(tex, averageBuf, outputBuf);
