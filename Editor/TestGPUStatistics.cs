@@ -1,16 +1,12 @@
-﻿using UnityEngine;
-using UnityEditor;
-using UnityEngine.TestTools;
 using NUnit.Framework;
-using System.Collections;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using UnityEditor;
+using UnityEngine;
 
 namespace GPUImageStatisticsSystem {
 
-    public class TestGPUStatistics {
+	public class TestGPUStatistics {
         public const string IMAGE_NAME = "SampleImage";
 
         public const string CS_NAME = "Statistics";
