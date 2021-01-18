@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 
-namespace GPUImageStatisticsSystem {
+namespace GPUImageStatisticsSystem.Editor {
 
 	public class TestGPUStatistics {
         public const string IMAGE_NAME = "SampleImage";

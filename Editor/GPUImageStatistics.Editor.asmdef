@@ -1,0 +1,17 @@
+{
+    "name": "GPUImageStatistics.Editor",
+    "references": [
+        "GUID:45a116bc32b7aaf4c975615fb8caebee"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
