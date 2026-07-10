@@ -1,0 +1,10 @@
+{
+  "name": "jp.nobnak.gpu_image_statistics",
+  "version": "1.0.0",
+  "displayName": "GPU Image Statistics",
+  "description": "GPU Image Statistics library for Unity",
+  "unity": "6000.0",
+  "author": {
+    "name": "nobnak"
+  }
+}
