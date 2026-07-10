@@ -1,7 +1,10 @@
 {
-    "name": "GPUImageStatistics.Editor",
+    "name": "GPUImageStatistics.Tests.Editor",
+    "rootNamespace": "GPUImageStatisticsSystem.Editor",
     "references": [
-        "GUID:45a116bc32b7aaf4c975615fb8caebee"
+        "GPUImageStatistics",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
@@ -10,7 +13,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

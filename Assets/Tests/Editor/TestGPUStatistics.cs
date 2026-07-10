@@ -65,7 +65,7 @@ namespace GPUImageStatisticsSystem.Editor {
 
         private string Format(Vector4 v, string accuracy = "e2") {
             return string.Format(
-                string.Format("({{0:{0}}},{{1:{0}}},{{2:{0}}},{{3:{0}}}", accuracy),
+                string.Format("({{0:{0}}},{{1:{0}}},{{2:{0}}},{{3:{0}}})", accuracy),
                 v.x, v.y, v.z, v.w);
         }
         private void AreApproximatelyEqual(Vector4 expected, Vector4 actual, float delta = ACCURACY_ABSOLUTE) {
