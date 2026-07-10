@@ -3,6 +3,8 @@ using UnityEngine;
 
 namespace GPUImageStatisticsSystem {
 
+	public enum StatisticsColorSpace { Linear, SRGB }
+
 	public class GPUStatistics {
 		public const string CS_NAME = "Statistics";
 		public const string KERNEL_SUM = "Sum";
@@ -22,10 +24,9 @@ namespace GPUImageStatisticsSystem {
 		public const string PROP_PARAM0_4 = "_Param0_4";
 		public const string PROP_PARAM0_4x4 = "_Param0_4x4";
 		public const string PROP_PARAM_BUF0_4 = "_ParamBuf0_4";
+		public const string PROP_COLOR_SPACE_GAMMA = "_ColorSpaceGamma";
 
 		public const int NUM_THREADS = 16;
-		public const int SCALE_TO_INT = 255;
-		public const float SCALE_TO_FLOAT = 1f / SCALE_TO_INT;
 
 		public static readonly int STRIDE_OF_VECTOR4 = Marshal.SizeOf(typeof(Vector4));
 		public static readonly int STRIDE_OF_VECTOR4x4 = Marshal.SizeOf(typeof(Matrix4x4));
@@ -36,6 +37,12 @@ namespace GPUImageStatisticsSystem {
 		protected readonly int kernelMultiply4;
 		protected readonly int kernelMultiply4x4;
 		protected readonly int kernelCovariance;
+		protected StatisticsColorSpace colorSpace = StatisticsColorSpace.SRGB;
+
+		public StatisticsColorSpace ColorSpace {
+			get { return colorSpace; }
+			set { colorSpace = value; }
+		}
 
 		public GPUStatistics() {
 			reduction = new GPUReduction();
@@ -44,6 +51,10 @@ namespace GPUImageStatisticsSystem {
 			kernelMultiply4 = cs.FindKernel(KERNEL_MULTIPLY4);
 			kernelMultiply4x4 = cs.FindKernel(KERNEL_MULTIPLY4x4);
 			kernelCovariance = cs.FindKernel(KERNEL_COVARIANCE);
+		}
+
+		void BindColorSpace() {
+			cs.SetFloat(PROP_COLOR_SPACE_GAMMA, colorSpace == StatisticsColorSpace.SRGB ? 1f : 0f);
 		}
 
 		#region Sum
@@ -61,6 +72,7 @@ namespace GPUImageStatisticsSystem {
 			var totalHeight = Mathf.CeilToInt(tex.width / (float)NUM_THREADS);
 
 			using (var totalBuf = new DisposableBuffer(totalWidth * totalHeight, STRIDE_OF_VECTOR4)) {
+				BindColorSpace();
 				cs.SetInts(PROP_INPUT_SIZE, tex.width, tex.height);
 				cs.SetTexture(kernelSum, PROP_INPUT_IMAGE, tex);
 
@@ -112,6 +124,7 @@ namespace GPUImageStatisticsSystem {
 
 			using (var totalCovBuf = new DisposableBuffer(totalWidth * totalHeight, STRIDE_OF_VECTOR4x4))
 			using (var totalBuf = new DisposableBuffer(1, STRIDE_OF_VECTOR4x4)) {
+				BindColorSpace();
 				cs.SetInts(PROP_INPUT_SIZE, tex.width, tex.height);
 				cs.SetTexture(kernelCovariance, PROP_INPUT_IMAGE, tex);
 
